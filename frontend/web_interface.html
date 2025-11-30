@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Navigation System</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            min-height: 600px;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #dee2e6;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .select2-container {
+            width: 100% !important;
+        }
+
+        .select2-selection {
+            height: 48px !important;
+            border: 2px solid #e9ecef !important;
+            border-radius: 8px !important;
+        }
+
+        .select2-selection__rendered {
+            line-height: 44px !important;
+            padding-left: 12px !important;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(45deg, #2980b9, #21618c);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .map-container {
+            position: relative;
+            background: #ecf0f1;
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e9ecef;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .route-info {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+            display: none;
+        }
+
+        .route-info h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .route-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #3498db;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .charging-stops {
+            margin-top: 20px;
+        }
+
+        .charging-stop {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+        }
+
+        .charging-stop h4 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .charging-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #dc3545;
+            display: none;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #28a745;
+            display: none;
+        }
+
+        .vehicle-info {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .custom-marker-start {
+            background: #28a745;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .custom-marker-end {
+            background: #dc3545;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .custom-marker-charging {
+            background: #ffc107;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 350px 1fr;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr;
+            }
+            
+            .control-panel {
+                border-right: none;
+                border-bottom: 1px solid #dee2e6;
+            }
+
+            #map {
+                height: 500px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            body {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .control-panel {
+                padding: 20px;
+            }
+
+            .route-stats {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗⚡ EV Navigation System</h1>
+            <p>Akıllı elektrikli araç navigasyon ve rota planlama sistemi</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="control-panel">
+                <form id="routeForm">
+                    <div class="form-group">
+                        <label for="startLocation">🏁 Başlangıç Noktası</label>
+                        <input 
+                            type="text" 
+                            id="startLocation" 
+                            class="form-control" 
+                            placeholder="Örn: Taksim, İstanbul"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="endLocation">🎯 Hedef Nokta</label>
+                        <input 
+                            type="text" 
+                            id="endLocation" 
+                            class="form-control" 
+                            placeholder="Örn: Galata Kulesi, İstanbul"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="vehicleSelect">🚙 Araç Seçimi</label>
+                        <select id="vehicleSelect" class="form-control" required>
+                            <option value="">Aracınızı seçin...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="batteryLevel">🔋 Mevcut Batarya Seviyesi (%)</label>
+                        <input 
+                            type="number" 
+                            id="batteryLevel" 
+                            class="form-control" 
+                            min="5" 
+                            max="100" 
+                            value="80"
+                            required
+                        >
+                    </div>
+                    
+                    <button type="submit" class="btn" id="planRouteBtn">
+                        🗺️ Rota Planla
+                    </button>
+                </form>
+                
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage"></div>
+                <div class="vehicle-info" id="vehicleInfo"></div>
+                
+                <div class="route-info" id="routeInfo">
+                    <h3>📊 Rota Bilgileri</h3>
+                    <div class="route-stats" id="routeStats">
+                        <!-- Dynamic content -->
+                    </div>
+                    <div class="charging-stops" id="chargingStops">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <script>
+        class EVNavigationApp {
+            constructor() {
+                this.map = null;
+                this.vehicles = [];
+                this.currentRoute = null;
+                this.markers = [];
+                this.routeLine = null;
+                
+                this.init();
+            }
+            
+            async init() {
+                this.initMap();
+                await this.loadVehicles();
+                this.setupEventListeners();
+                this.showSuccessMessage('Sistem hazır! Rota planlamaya başlayabilirsiniz.');
+            }
+            
+            initMap() {
+                // Initialize Leaflet map centered on Turkey
+                this.map = L.map('map').setView([39.9334, 32.8597], 6);
+                
+                // Add OpenStreetMap tile layer
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(this.map);
+                
+                console.log('Harita başarıyla yüklendi');
+            }
+            
+            async loadVehicles() {
+                try {
+                    this.showLoading('Araç verileri yükleniyor...');
+                    
+                    const response = await fetch('/api/vehicles-db');
+                    const data = await response.json();
+                    
+                    if (data.vehicles) {
+                        this.vehicles = data.vehicles;
+                        this.populateVehicleSelect();
+                        console.log(`${this.vehicles.length} araç yüklendi`);
+                    } else {
+                        throw new Error('Araç verileri alınamadı');
+                    }
+                } catch (error) {
+                    console.error('Araç yükleme hatası:', error);
+                    this.showError('Araç verileri yüklenemedi. Lütfen sayfayı yenileyin.');
+                } finally {
+                    this.hideLoading();
+                }
+            }
+            
+            populateVehicleSelect() {
+                const select = $('#vehicleSelect');
+                select.empty().append('<option value="">Aracınızı seçin...</option>');
+                
+                // Group vehicles by brand
+                const groupedVehicles = {};
+                this.vehicles.forEach(vehicle => {
+                    if (!groupedVehicles[vehicle.brand]) {
+                        groupedVehicles[vehicle.brand] = [];
+                    }
+                    groupedVehicles[vehicle.brand].push(vehicle);
+                });
+                
+                // Add options with grouping
+                Object.keys(groupedVehicles).sort().forEach(brand => {
+                    const optgroup = $(`<optgroup label="${brand}"></optgroup>`);
+                    
+                    groupedVehicles[brand].sort((a, b) => a.model.localeCompare(b.model)).forEach(vehicle => {
+                        const option = $(`<option value="${vehicle.brand}_${vehicle.model}"></option>`);
+                        option.text(`${vehicle.model} (${vehicle.range_km}km menzil)`);
+                        option.data('vehicle', vehicle);
+                        optgroup.append(option);
+                    });
+                    
+                    select.append(optgroup);
+                });
+                
+                // Initialize Select2
+                select.select2({
+                    placeholder: 'Aracınızı seçin...',
+                    searchInputPlaceholder: 'Araç ara...'
+                });
+            }
+            
+            setupEventListeners() {
+                // Form submission
+                $('#routeForm').on('submit', (e) => {
+                    e.preventDefault();
+                    this.planRoute();
+                });
+                
+                // Vehicle selection change
+                $('#vehicleSelect').on('change', (e) => {
+                    const selectedOption = $(e.target).find('option:selected');
+                    const vehicle = selectedOption.data('vehicle');
+                    
+                    if (vehicle) {
+                        this.showVehicleInfo(vehicle);
+                    } else {
+                        $('#vehicleInfo').hide();
+                    }
+                });
+                
+                // Clear messages on input change
+                $('#startLocation, #endLocation').on('input', () => {
+                    this.hideMessages();
+                });
+            }
+            
+            showVehicleInfo(vehicle) {
+                const info = $('#vehicleInfo');
+                info.html(`
+                    <strong>🚗 ${vehicle.brand} ${vehicle.model}</strong><br>
+                    <small>
+                        🔋 Menzil: ${vehicle.range_km} km |
+                        ⚡ Batarya: ${vehicle.battery_kwh || 'Belirtilmemiş'} kWh |
+                        🔌 Şarj Gücü: ${vehicle.charging_kw || 'Belirtilmemiş'} kW
+                    </small>
+                `);
+                info.show();
+            }
+            
+            async planRoute() {
+                try {
+                    this.showLoading('Rota planlanıyor...');
+                    this.hideMessages();
+                    
+                    // Get form data
+                    const startLocation = $('#startLocation').val().trim();
+                    const endLocation = $('#endLocation').val().trim();
+                    const vehicleKey = $('#vehicleSelect').val();
+                    const batteryLevel = parseInt($('#batteryLevel').val());
+                    
+                    // Validation
+                    if (!startLocation || !endLocation || !vehicleKey) {
+                        throw new Error('Lütfen tüm alanları doldurun');
+                    }
+                    
+                    if (batteryLevel < 5 || batteryLevel > 100) {
+                        throw new Error('Batarya seviyesi 5-100% arasında olmalıdır');
+                    }
+                    
+                    // Get selected vehicle
+                    const selectedOption = $('#vehicleSelect').find('option:selected');
+                    const vehicle = selectedOption.data('vehicle');
+                    
+                    if (!vehicle) {
+                        throw new Error('Geçerli bir araç seçin');
+                    }
+                    
+                    // Make API request
+                    const response = await fetch('/api/plan-enhanced-route', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            start_location: startLocation,
+                            destination: endLocation,
+                            vehicle_model: `${vehicle.brand} ${vehicle.model}`,
+                            battery_level: batteryLevel,
+                            vehicle_specs: vehicle
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(result.detail || 'Rota planlaması başarısız oldu');
+                    }
+                    
+                    // Display results
+                    this.currentRoute = result;
+                    this.displayRoute(result);
+                    this.showSuccessMessage('Rota başarıyla planlandı!');
+                    
+                } catch (error) {
+                    console.error('Rota planlama hatası:', error);
+                    this.showError(error.message);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+            
+            displayRoute(routeData) {
+                // Clear existing route
+                this.clearRoute();
+                
+                // Show route info panel
+                $('#routeInfo').show();
+                
+                // Update route statistics
+                this.updateRouteStats(routeData);
+                
+                // Update charging stops
+                this.updateChargingStops(routeData.charging_stops || []);
+                
+                // Draw route on map
+                this.drawRoute(routeData);
+            }
+            
+            updateRouteStats(routeData) {
+                const stats = $('#routeStats');
+                stats.html(`
+                    <div class="stat-item">
+                        <span class="stat-value">${routeData.total_distance_km || 'N/A'}</span>
+                        <div class="stat-label">Toplam Mesafe (km)</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">${Math.round((routeData.estimated_time_minutes || 0) / 60)}h ${(routeData.estimated_time_minutes || 0) % 60}m</span>
+                        <div class="stat-label">Tahmini Süre</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">${(routeData.final_battery_level * 100 || 0).toFixed(0)}%</span>
+                        <div class="stat-label">Varış Bataryası</div>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value">${routeData.charging_stops ? routeData.charging_stops.length : 0}</span>
+                        <div class="stat-label">Şarj Durağı</div>
+                    </div>
+                `);
+            }
+            
+            updateChargingStops(chargingStops) {
+                const container = $('#chargingStops');
+                container.empty();
+                
+                if (chargingStops.length === 0) {
+                    container.html('<p><em>Bu rota için şarj durağı gerekmiyor! ✨</em></p>');
+                    return;
+                }
+                
+                chargingStops.forEach((stop, index) => {
+                    const stopHtml = `
+                        <div class="charging-stop">
+                            <h4>🔌 Şarj Durağı ${index + 1}: ${stop.station_name || 'Bilinmeyen İstasyon'}</h4>
+                            <div class="charging-details">
+                                <div>⚡ Güç: ${stop.charging_power_kw || 'N/A'} kW</div>
+                                <div>🕐 Süre: ${stop.estimated_charging_time_minutes || 'N/A'} dk</div>
+                                <div>🔋 Giriş: ${(stop.battery_level_before * 100 || 0).toFixed(0)}%</div>
+                                <div>🔋 Çıkış: ${(stop.battery_level_after * 100 || 0).toFixed(0)}%</div>
+                                <div>💰 Maliyet: ${stop.estimated_cost ? stop.estimated_cost.toFixed(2) + ' TL' : 'N/A'}</div>
+                            </div>
+                        </div>
+                    `;
+                    container.append(stopHtml);
+                });
+            }
+            
+            async drawRoute(routeData) {
+                // This is a simplified implementation
+                // In a real app, you'd use the actual route waypoints
+                
+                if (!routeData.map_data) {
+                    console.log('Harita verisi mevcut değil, sadece temel bilgiler gösteriliyor');
+                    return;
+                }
+                
+                const mapData = routeData.map_data;
+                
+                // Add markers
+                if (mapData.markers) {
+                    mapData.markers.forEach(marker => {
+                        let markerIcon;
+                        let popupText = marker.title;
+                        
+                        switch (marker.type) {
+                            case 'start':
+                                markerIcon = L.divIcon({
+                                    className: 'custom-marker-start',
+                                    iconSize: [30, 30],
+                                    html: '🏁'
+                                });
+                                break;
+                            case 'destination':
+                                markerIcon = L.divIcon({
+                                    className: 'custom-marker-end',
+                                    iconSize: [30, 30],
+                                    html: '🎯'
+                                });
+                                break;
+                            case 'charging':
+                                markerIcon = L.divIcon({
+                                    className: 'custom-marker-charging',
+                                    iconSize: [25, 25],
+                                    html: '⚡'
+                                });
+                                if (marker.info) {
+                                    popupText += `<br><small>Güç: ${marker.info.power} kW<br>Süre: ${marker.info.duration}</small>`;
+                                }
+                                break;
+                            default:
+                                markerIcon = L.marker();
+                        }
+                        
+                        const mapMarker = L.marker([marker.lat, marker.lon], {
+                            icon: markerIcon
+                        }).addTo(this.map);
+                        
+                        mapMarker.bindPopup(popupText);
+                        this.markers.push(mapMarker);
+                    });
+                }
+                
+                // Draw route line (simplified)
+                if (mapData.route_polyline && mapData.route_polyline !== '') {
+                    // Parse simplified polyline format
+                    const coordinates = mapData.route_polyline.split('|').map(point => {
+                        const [lat, lng] = point.split(',').map(Number);
+                        return [lat, lng];
+                    });
+                    
+                    if (coordinates.length >= 2) {
+                        this.routeLine = L.polyline(coordinates, {
+                            color: '#3498db',
+                            weight: 5,
+                            opacity: 0.8
+                        }).addTo(this.map);
+                    }
+                }
+                
+                // Fit map to bounds
+                if (mapData.bounds) {
+                    const bounds = [
+                        [mapData.bounds.south, mapData.bounds.west],
+                        [mapData.bounds.north, mapData.bounds.east]
+                    ];
+                    this.map.fitBounds(bounds, { padding: [20, 20] });
+                } else if (this.markers.length > 0) {
+                    // Fallback: fit to markers
+                    const group = new L.featureGroup(this.markers);
+                    this.map.fitBounds(group.getBounds().pad(0.1));
+                }
+            }
+            
+            clearRoute() {
+                // Remove existing markers
+                this.markers.forEach(marker => {
+                    this.map.removeLayer(marker);
+                });
+                this.markers = [];
+                
+                // Remove existing route line
+                if (this.routeLine) {
+                    this.map.removeLayer(this.routeLine);
+                    this.routeLine = null;
+                }
+                
+                // Hide route info
+                $('#routeInfo').hide();
+            }
+            
+            showLoading(message = 'Yükleniyor...') {
+                $('#loadingOverlay').show();
+                $('#planRouteBtn').prop('disabled', true).text(message);
+            }
+            
+            hideLoading() {
+                $('#loadingOverlay').hide();
+                $('#planRouteBtn').prop('disabled', false).text('🗺️ Rota Planla');
+            }
+            
+            showError(message) {
+                $('#errorMessage').text(message).show();
+                setTimeout(() => $('#errorMessage').hide(), 8000);
+            }
+            
+            showSuccessMessage(message) {
+                $('#successMessage').text(message).show();
+                setTimeout(() => $('#successMessage').hide(), 5000);
+            }
+            
+            hideMessages() {
+                $('#errorMessage, #successMessage').hide();
+            }
+        }
+        
+        // Initialize application when DOM is ready
+        $(document).ready(() => {
+            new EVNavigationApp();
+        });
+    </script>
+</body>
+</html>
